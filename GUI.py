@@ -324,7 +324,40 @@ class Handler:
 		builder.connect_signals(Handler())
 		ggfw.show_all()
 		openw += 1
+		
+	def gpfsaveclicked(self, widget):
+		
+		dialog = Gtk.FileChooserDialog("Save Problem File", widget.get_toplevel(), Gtk.FileChooserAction.SAVE, (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK))
+
+		self.add_filters(dialog)
+		response = dialog.run()
+		
+		s0 = int(widget.get_toplevel().get_children()[0].get_children()[0].get_children()[2].get_value())
+		s1 = int(widget.get_toplevel().get_children()[0].get_children()[0].get_children()[4].get_value())
+		s2 = int(widget.get_toplevel().get_children()[0].get_children()[0].get_children()[6].get_value())
+		dvtbuf = widget.get_toplevel().get_children()[0].get_children()[2].get_children()[0].get_buffer()
+		
+		dv = dvtbuf.get_text(dvtbuf.get_start_iter(), dvtbuf.get_end_iter(), False)
+		
+		if response == Gtk.ResponseType.OK:
 			
+			fname = dialog.get_filename()
+			with open(fname, "w") as f:
+				f.write("%d %d %d\n" % (s0, s1, s2))
+				f.write("%s" % (dv, ))				
+			
+		dialog.destroy()
+		
+	def gpfcancelclicked(self, widget):
+		widget.get_toplevel().destroy()
+		self.gtk_main_quit()
+		
+	
+	def add_filters(self, dialog):
+		filter_text = Gtk.FileFilter()
+		filter_text.set_name("Text files")
+		filter_text.add_mime_type("text/plain")
+		dialog.add_filter(filter_text)
 			
 ##########################################################################################################################################
 
