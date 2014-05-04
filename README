@@ -1,0 +1,11 @@
+Channel Assigner
+
+Authors:
+
+Arindam Nandi
+Agniva Dutta
+Subhra Saha
+
+Channel assigner is a program that assigns frequency bands to nodes in a network based on their individual demands, ensuring that bands assigned to neighboring nodes are far enough apart to not cause interference during communication, while at the same time aiming to waste as little bandwidth as possible.
+
+The core algorithm is coded in C to ensure best performance in the file AssignFrequency.c, while the GUI and graph drawing is done with Python. The graph are drawn using a 3rd-party Python module "graph-tool" (http://graph-tool.skewed.de/) by Tiago P. Peixoto.
