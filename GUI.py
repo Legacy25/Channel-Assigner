@@ -5,6 +5,7 @@ from threading import Thread
 import subprocess, time, shutil, os, re, timeit
 
 GObject.threads_init()
+openw = 0
 
 def draw(pFile=None, gFile=None, oFile=None, vfontsize=12, vfontfamily = "Ubuntu, Light", outputsize=(1000, 800), outputlocation = None):
 	
@@ -141,7 +142,12 @@ class Handler:
 		self.timed = False
 		
 	def gtk_main_quit(self, *args):
-		Gtk.main_quit(*args)
+		
+		global openw
+		openw -= 1
+		
+		if openw == -1:
+			Gtk.main_quit(*args)
 		
 	def pfileset(self, widget):
 		self.pFile = widget.get_filename()
@@ -155,15 +161,69 @@ class Handler:
 		if self.pFile is not None:
 			self.check_inputs()
 			
-	def check_inputs(self):
+	def check_inputs(self):		
 		with open (self.pFile, "r") as pf:
-    			p = pf.read().replace('\n', ' ')
+			p = pf.read()
+			    			
 		with open (self.gFile, "r") as gf:
-    			g = gf.read().replace('\n', ' ')
+    			g = gf.read()
+    			    		
+		if re.search(r'\b-[\d]+\b', p):
+    			self.report_invalid_input(errcode = 1)
+    			return False    		
+    		
+		if re.search(r'\b-[\d]+\b', g):
+    			self.report_invalid_input(errcode = 2)
+    			return False    	
+    		
+		if re.search(r'[^\d\s]+', p):
+    			self.report_invalid_input(errcode = 3)
+    			return False
+    		
+		if re.search(r'[^\d\s]+', g):
+    			self.report_invalid_input(errcode = 4)
+    			return False
+    			
+		pvals = re.findall(r'\b[\d]+\b', p)
+		gvals = re.findall(r'\b[\d]+\b', g)
+    		
+		if len(pvals) == 0:
+    			self.report_invalid_input(errcode = 5)
+    			return False
+    			
+		if len(gvals) == 0:
+    			self.report_invalid_input(errcode = 6)
+    			return False
+    		
+		vertices = int(gvals[0])
+		if len(pvals) != (vertices + 3):
+    			self.report_invalid_input(errcode = 7)
+    			return False
+    		
+    		   			
+		return True
 		
-		p = p.split()
-		g = g.split()
-		nodes = g[0]
+		
+	def report_invalid_input(self, errcode=0):
+
+		l = builder.get_object("status")
+		
+		if errcode == 0:
+			l.set_markup("<span foreground=\"red\">Invalid input files</span>")
+		elif errcode == 1:
+			l.set_markup("<span foreground=\"red\">Invalid problem file, negative values not allowed</span>")
+		elif errcode == 2:
+			l.set_markup("<span foreground=\"red\">Invalid graph file, negative values not allowed</span>")
+		elif errcode == 3:
+			l.set_markup("<span foreground=\"red\">Invalid characters in problem file, only numerical data allowed</span>")
+		elif errcode == 4:
+			l.set_markup("<span foreground=\"red\">Invalid characters in graph file, only numerical data allowed</span>")
+		elif errcode == 5:
+			l.set_markup("<span foreground=\"red\">Invalid input, problem file is empty</span>")
+		elif errcode == 6:
+			l.set_markup("<span foreground=\"red\">Invalid input, graph file is empty</span>")
+		elif errcode == 7:
+			l.set_markup("<span foreground=\"red\">Invalid input, incorrect number of parameters in problem file</span>")
 		
 	
 	def ofileset(self, widget):
@@ -208,13 +268,16 @@ class Handler:
 			else:
 				l.set_text("Please select the output location!")
 				return
+				
+		valid = self.check_inputs()
 		
-		b.set_sensitive(False)	
-		l.set_text("Computing!")
-		s.start()
+		if valid:		
+			b.set_sensitive(False)	
+			l.set_text("Computing!")
+			s.start()
 		
-		t = Thread(target=self.compute_thread, args = (b, l, s))
-		t.start()
+			t = Thread(target=self.compute_thread, args = (b, l, s))
+			t.start()
 			
 		
 	def compute_thread(self, button, label, spinner):
@@ -225,7 +288,7 @@ class Handler:
 				time = min(timeit.Timer("subprocess.check_output([\"./AssignFrequency\", \""+self.pFile+"\", \""+self.gFile+"\", \""+self.oFile+"\"])", setup = "import subprocess").repeat(3, 1000))
 				draw(pFile = self.pFile, gFile = self.gFile, oFile = self.oFile, outputlocation = self.ofLoc)
 			
-				label.set_text("Execution completed! Time: "+str(time)+" milliseconds (averaged over 1000 executions)")
+				label.set_markup("<span foreground=\"green\">Execution completed! Time: "+str(time)+" milliseconds (averaged over 1000 executions)</span>")
 				button.set_sensitive(True)
 				spinner.stop()
 			else:
@@ -233,18 +296,42 @@ class Handler:
 				
 				draw(pFile = self.pFile, gFile = self.gFile, oFile = self.oFile, outputlocation = self.ofLoc)
 			
-				label.set_text("Execution completed!")
+				label.set_markup("<span foreground=\"green\">Execution completed!</span>")
 				button.set_sensitive(True)
 				spinner.stop()
 			
 		except subprocess.CalledProcessError as cpe:
-			label.set_text("Invalid Input! Reason: "+cpe.output.replace("\n", " ").decode("utf-8"))
+			label.set_markup("<span foreground=\"red\">Invalid Input! Reason: %s </span>" % cpe.output.replace("\n", " ").decode("utf-8"))
 			button.set_sensitive(True)
 			spinner.stop()
 			
+	def gpf(self, widget):
+		global openw
+		builder = Gtk.Builder()
+		builder.add_from_file("GUI.glade")
 		
+		gpfw = builder.get_object("generatepfile")
+		builder.connect_signals(Handler())
+		gpfw.show_all()
+		openw += 1
+		
+	def ggf(self, widget):
+		global openw
+		builder = Gtk.Builder()
+		builder.add_from_file("GUI.glade")
+		
+		ggfw = builder.get_object("generategfile")
+		builder.connect_signals(Handler())
+		ggfw.show_all()
+		openw += 1
+			
+			
+##########################################################################################################################################
+
+
 
 builder.connect_signals(Handler())
 
 window.show_all()
+openw += 1
 Gtk.main()
