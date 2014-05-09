@@ -5,9 +5,9 @@ from threading import Thread
 import subprocess, time, shutil, os, re, timeit
 
 GObject.threads_init()
-openw = 0
+openw, currentphase, maxphase = 0, 0, 0
 
-def draw(pFile=None, gFile=None, oFile=None, vfontsize=12, vfontfamily = "Ubuntu, Light", outputsize=(1000, 800), outputlocation = None):
+def draw(pFile=None, gFile=None, oFile=None, vfontsize=9, vfontfamily = "Ubuntu", outputsize=(700, 400), outputlocation = None, outputtextview = None):
 	
 	if outputlocation is None:
 		outputlocation = os.getcwd()
@@ -51,7 +51,7 @@ def draw(pFile=None, gFile=None, oFile=None, vfontsize=12, vfontfamily = "Ubuntu
 	
 
 	# Draw the problem graph
-	graph_draw(g, output_size = outputsize, nodesfirst = True, vertex_text = demand, vorder = g.vertex_index, vertex_size = 10, vertex_color = "black", vertex_fill_color = "black", vertex_font_size = vfontsize, vertex_font_family = vfontfamily, vertex_text_position = 1, edge_pen_width = 0.5, output = "cagd_phase0000.svg")
+	graph_draw(g, output_size = outputsize, nodesfirst = True, vertex_text = demand, vertex_pen_width = 1, vertex_text_color = "blue", vorder = g.vertex_index, vertex_size = 6, vertex_color = "black", vertex_fill_color = "cyan", vertex_font_size = vfontsize, vertex_font_family = vfontfamily, vertex_text_position = 1, edge_color = "grey", edge_pen_width = 0.5, output = "cagd_phase0000.svg")
 
 	shutil.copy("cagd_phase0000.svg", outputlocation)
 	os.remove("cagd_phase0000.svg")
@@ -61,10 +61,15 @@ def draw(pFile=None, gFile=None, oFile=None, vfontsize=12, vfontfamily = "Ubuntu
 	# Opening the Output file
 	lines = [line.strip() for line in open(oFile)]
 
+	if outputtextview is not None:
+		outbuf = outputtextview.get_buffer()
+		outbuf.insert(outbuf.get_start_iter(), '\n'.join(lines))
 
-	# Define new property map for edge widths and frequency assignments
+
+	# Define new property map for edge widths, frequency assignments and vertix fill colors
 	edge_width = g.new_edge_property("float")
 	freq_assign = g.new_vertex_property("string")
+	vfillcolor = g.new_vertex_property("string")
 
 
 
@@ -81,6 +86,9 @@ def draw(pFile=None, gFile=None, oFile=None, vfontsize=12, vfontfamily = "Ubuntu
 		# Reset edge widths to default value
 		for a in g.edges():
 			edge_width[a] = 0.5
+
+		for a in g.vertices():
+			vfillcolor[a] = "cyan"
 	
 		# Populating the frequncy assigned vector as a Property Map for the graph g with initial string consisting of just the node index
 		for a in range(0, numnodes):
@@ -90,6 +98,7 @@ def draw(pFile=None, gFile=None, oFile=None, vfontsize=12, vfontfamily = "Ubuntu
 		while lines[i] != "":
 			vertex = int(lines[i].split()[0].split(":")[0])
 			vlist.append(vertex)
+			vfillcolor[g.vertex(vertex)] = "black"
 			flist = lines[i].split()[1:]
 			freq_assign[vertex_list[vertex]] +=  " [" + flist[0] + "-" + flist[-1] +"]"
 			i = i + 1
@@ -101,17 +110,20 @@ def draw(pFile=None, gFile=None, oFile=None, vfontsize=12, vfontfamily = "Ubuntu
 		for k in vlist:
 			for l in vlist[vlist.index(k)+1:]:
 				if g.edge(k, l) != None:
-					edge_width[g.edge(k, l)] = 4			
+					edge_width[g.edge(k, l)] = 3			
 	
 	
 		# Draw the graph for current phase
 		outputfilename = "cagd_phase"+("%04d" % int(phase))+".svg"
-		graph_draw(g, nodesfirst = True, vertex_text = freq_assign, vorder = g.vertex_index, vertex_size = 10, vertex_color = "black", vertex_fill_color = "black", vertex_font_size = vfontsize, vertex_font_family = vfontfamily, vertex_text_position = 0, edge_pen_width = edge_width, output_size = outputsize, output = outputfilename)
+		graph_draw(g, nodesfirst = True, vertex_text = freq_assign, vorder = g.vertex_index, vertex_pen_width = 1, vertex_text_color = "blue", vertex_size = 6, vertex_color = "black", vertex_fill_color = vfillcolor, vertex_font_size = vfontsize, vertex_font_family = vfontfamily, vertex_text_position = 0, edge_color = "grey", edge_pen_width = edge_width, output_size = outputsize, output = outputfilename)
 	
 		shutil.copy(outputfilename, outputlocation)
 		os.remove(outputfilename)
 	
 		i = i + 1
+
+	global maxphase
+	maxphase = phase
 		
 		
 		
@@ -242,11 +254,20 @@ class Handler:
 		else:
 			self.timed = True
 	
-	def compute_clicked(self, widget):
-		
+	def compute_clicked(self, widget):	
+
+		global currentphase, maxphase
+		currentphase, maxphase = 0, 0
+
+		builder.get_object("btnprev").set_sensitive(False)
+		builder.get_object("btnnext").set_sensitive(False)
+
 		b = builder.get_object("btncompute")
 		l = builder.get_object("status")
 		s = builder.get_object("spinner1")
+		tv = builder.get_object("outputtv")
+		tvbuf = tv.get_buffer()
+		tvbuf.delete(tvbuf.get_start_iter(), tvbuf.get_end_iter())
 		
 		if self.pFile is None:
 			if pfcb.get_filename() is not None:
@@ -276,29 +297,34 @@ class Handler:
 			l.set_text("Computing!")
 			s.start()
 		
-			t = Thread(target=self.compute_thread, args = (b, l, s))
+			t = Thread(target=self.compute_thread, args = (b, l, s, tv))
 			t.start()
 			
 		
-	def compute_thread(self, button, label, spinner):
-		
-		
+	def compute_thread(self, button, label, spinner, textview):
+
 		try:
 			if self.timed:
 				time = min(timeit.Timer("subprocess.check_output([\"./AssignFrequency\", \""+self.pFile+"\", \""+self.gFile+"\", \""+self.oFile+"\"])", setup = "import subprocess").repeat(3, 1000))
-				draw(pFile = self.pFile, gFile = self.gFile, oFile = self.oFile, outputlocation = self.ofLoc)
-			
+				draw(pFile = self.pFile, gFile = self.gFile, oFile = self.oFile, outputlocation = self.ofLoc, outputtextview = textview)			
 				label.set_markup("<span foreground=\"green\">Execution completed! Time: "+str(time)+" milliseconds (averaged over 1000 executions)</span>")
-				button.set_sensitive(True)
-				spinner.stop()
-			else:
-				timeit.Timer("subprocess.check_output([\"./AssignFrequency\", \""+self.pFile+"\", \""+self.gFile+"\", \""+self.oFile+"\"])", setup = "import subprocess").timeit(number = 1)
 				
-				draw(pFile = self.pFile, gFile = self.gFile, oFile = self.oFile, outputlocation = self.ofLoc)
-			
+			else:
+				timeit.Timer("subprocess.check_output([\"./AssignFrequency\", \""+self.pFile+"\", \""+self.gFile+"\", \""+self.oFile+"\"])", setup = "import subprocess").timeit(number = 1)				
+				draw(pFile = self.pFile, gFile = self.gFile, oFile = self.oFile, outputlocation = self.ofLoc, outputtextview = textview)			
 				label.set_markup("<span foreground=\"green\">Execution completed!</span>")
-				button.set_sensitive(True)
-				spinner.stop()
+
+			button.set_sensitive(True)
+			spinner.stop()
+
+			bnext = builder.get_object("btnnext")
+			gimage = builder.get_object("image10")
+			label = builder.get_object("framelabel")
+
+			gimage.set_from_file(os.path.join(self.ofLoc, "cagd_phase0000.svg"))
+			label.set_markup("<b>Problem Graph</b>")
+
+			bnext.set_sensitive(True)
 			
 		except subprocess.CalledProcessError as cpe:
 			label.set_markup("<span foreground=\"red\">Invalid Input! Reason: %s </span>" % cpe.output.replace("\n", " ").decode("utf-8"))
@@ -383,6 +409,44 @@ class Handler:
 		filter_text.set_name("Text files")
 		filter_text.add_mime_type("text/plain")
 		dialog.add_filter(filter_text)
+
+	def btnprevclicked(self, widget):
+
+		global currentphase, maxphase
+		
+		label = builder.get_object("framelabel")
+		bnext = builder.get_object("btnnext")
+		currentphase -= 1
+
+		if not bnext.get_sensitive():
+			bnext.set_sensitive(True)
+
+		gimage = builder.get_object("image10")
+		gimage.set_from_file(os.path.join(self.ofLoc, ("cagd_phase%04d.svg" % currentphase)))
+		
+
+		if currentphase == 0:
+			label.set_markup("<b>Problem Graph</b>")
+			widget.set_sensitive(False)
+		else:
+			label.set_markup("<b>Phase "+str(currentphase)+"</b>")
+	
+	def btnnextclicked(self, widget):
+		global currentphase, maxphase
+		
+		label = builder.get_object("framelabel")
+		bprev = builder.get_object("btnprev")
+		currentphase += 1
+
+		if not bprev.get_sensitive():
+			bprev.set_sensitive(True)
+
+		gimage = builder.get_object("image10")
+		gimage.set_from_file(os.path.join(self.ofLoc, ("cagd_phase%04d.svg" % currentphase)))
+		label.set_markup("<b>Phase "+str(currentphase)+"</b>")
+		if currentphase == int(maxphase):
+			widget.set_sensitive(False)
+	
 			
 ##########################################################################################################################################
 
