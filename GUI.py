@@ -223,7 +223,7 @@ class Handler:
 		elif errcode == 6:
 			l.set_markup("<span foreground=\"red\">Invalid input, graph file is empty</span>")
 		elif errcode == 7:
-			l.set_markup("<span foreground=\"red\">Invalid input, incorrect number of parameters in problem file</span>")
+			l.set_markup("<span foreground=\"red\">Invalid input, problem parameters do not match graph input</span>")
 		
 	
 	def ofileset(self, widget):
@@ -347,8 +347,33 @@ class Handler:
 				f.write("%s" % (dv, ))				
 			
 		dialog.destroy()
+
+	def ggfsaveclicked(self, widget):
+		
+		dialog = Gtk.FileChooserDialog("Save Graph File", widget.get_toplevel(), Gtk.FileChooserAction.SAVE, (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK))
+
+		self.add_filters(dialog)
+		response = dialog.run()
+		
+		nodes = int(widget.get_toplevel().get_children()[0].get_children()[0].get_children()[2].get_value())
+		etbuf = widget.get_toplevel().get_children()[0].get_children()[2].get_children()[0].get_buffer()
+		
+		ed = etbuf.get_text(etbuf.get_start_iter(), etbuf.get_end_iter(), False)
+		
+		if response == Gtk.ResponseType.OK:
+			
+			fname = dialog.get_filename()
+			with open(fname, "w") as f:
+				f.write("%d\n" % (nodes))
+				f.write("%s" % (ed, ))				
+			
+		dialog.destroy()
 		
 	def gpfcancelclicked(self, widget):
+		widget.get_toplevel().destroy()
+		self.gtk_main_quit()
+
+	def ggfcancelclicked(self, widget):
 		widget.get_toplevel().destroy()
 		self.gtk_main_quit()
 		
