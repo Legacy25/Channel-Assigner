@@ -7,7 +7,7 @@ import subprocess, time, shutil, os, re, timeit
 GObject.threads_init()
 openw, currentphase, maxphase = 0, 0, 0
 
-def draw(pFile=None, gFile=None, oFile=None, vfontsize=9, vfontfamily = "Ubuntu", outputsize=(700, 400), outputlocation = None, outputtextview = None):
+def draw(pFile=None, gFile=None, oFile=None, vfontsize=15, vfontfamily = "Ubuntu", outputsize=(700, 400), outputlocation = None, outputtextview = None):
 	
 	if outputlocation is None:
 		outputlocation = os.getcwd()
@@ -51,7 +51,7 @@ def draw(pFile=None, gFile=None, oFile=None, vfontsize=9, vfontfamily = "Ubuntu"
 	
 
 	# Draw the problem graph
-	graph_draw(g, output_size = outputsize, nodesfirst = True, vertex_text = demand, vertex_pen_width = 1, vertex_text_color = "blue", vorder = g.vertex_index, vertex_size = 6, vertex_color = "black", vertex_fill_color = "cyan", vertex_font_size = vfontsize, vertex_font_family = vfontfamily, vertex_text_position = 1, edge_color = "grey", edge_pen_width = 0.5, output = "cagd_phase0000.svg")
+	graph_draw(g, output_size = outputsize, nodesfirst = True, vertex_text = demand, vertex_pen_width = 1, vertex_text_color = "black", vorder = g.vertex_index, vertex_color = "black", vertex_size = 6, vertex_fill_color = "black", vertex_font_size = 10, vertex_font_family = vfontfamily, vertex_text_position = 1, edge_color = "grey", edge_pen_width = 0.5, output = "cagd_phase0000.svg")
 
 	shutil.copy("cagd_phase0000.svg", outputlocation)
 	os.remove("cagd_phase0000.svg")
@@ -88,7 +88,7 @@ def draw(pFile=None, gFile=None, oFile=None, vfontsize=9, vfontfamily = "Ubuntu"
 			edge_width[a] = 0.5
 
 		for a in g.vertices():
-			vfillcolor[a] = "cyan"
+			vfillcolor[a] = "red"
 	
 		# Populating the frequncy assigned vector as a Property Map for the graph g with initial string consisting of just the node index
 		for a in range(0, numnodes):
@@ -100,7 +100,7 @@ def draw(pFile=None, gFile=None, oFile=None, vfontsize=9, vfontfamily = "Ubuntu"
 			vlist.append(vertex)
 			vfillcolor[g.vertex(vertex)] = "black"
 			flist = lines[i].split()[1:]
-			freq_assign[vertex_list[vertex]] +=  " [" + flist[0] + "-" + flist[-1] +"]"
+			#freq_assign[vertex_list[vertex]] +=  " [" + flist[0] + "-" + flist[-1] +"]"
 			i = i + 1
 
 		vlist.sort()
@@ -115,7 +115,7 @@ def draw(pFile=None, gFile=None, oFile=None, vfontsize=9, vfontfamily = "Ubuntu"
 	
 		# Draw the graph for current phase
 		outputfilename = "cagd_phase"+("%04d" % int(phase))+".svg"
-		graph_draw(g, nodesfirst = True, vertex_text = freq_assign, vorder = g.vertex_index, vertex_pen_width = 1, vertex_text_color = "blue", vertex_size = 6, vertex_color = "black", vertex_fill_color = vfillcolor, vertex_font_size = vfontsize, vertex_font_family = vfontfamily, vertex_text_position = 0, edge_color = "grey", edge_pen_width = edge_width, output_size = outputsize, output = outputfilename)
+		graph_draw(g, nodesfirst = True, vertex_text = freq_assign, vorder = g.vertex_index, vertex_pen_width = 1, vertex_text_color = "white", vertex_size = 20, vertex_color = "black", vertex_fill_color = vfillcolor, vertex_font_size = vfontsize, vertex_font_family = vfontfamily, vertex_text_position = -1, edge_color = "grey", edge_pen_width = edge_width, output_size = outputsize, output = outputfilename)
 	
 		shutil.copy(outputfilename, outputlocation)
 		os.remove(outputfilename)
